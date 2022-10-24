@@ -23,7 +23,7 @@ class BP_CVE:
         excel_df = excel_df.drop(columns=['Strike Result', 'Permutations'])
         
         # rename col
-        excel_df = excel_df.rename(columns={'Time of strike':'time', 'Strike Name':'name', 'Strike Reference':'reference', 'Strike Tuples':'network'})
+        excel_df = excel_df.rename(columns={'Time of strike':'Time', 'Strike Name':'Name', 'Strike Reference':'Reference', 'Strike Tuples':'Network'})
         
         self.bp_df = excel_df.sort_values('time').reset_index(drop=True)
         print(self.bp_df) #debug
