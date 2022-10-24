@@ -32,7 +32,10 @@ class BP_CVE:
 
 def main():
     bp_cve = BP_CVE()
+    #test
     bp_cve.read_Excel('data/TA-BP-CVE-TEST-attack_report-2022.07-arrange-jk.xlsx', 'arrange-jk')
+    
+    #product
     return
 
 if __name__ == "__main__":
