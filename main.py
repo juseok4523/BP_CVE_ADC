@@ -1,11 +1,10 @@
-from csv import excel
-from multiprocessing import set_forkserver_preload
-from select import select
-from weakref import ref
 import numpy as np
 import pandas as pd
 from pyExploitDb import PyExploitDb
 import csv
+import re
+from scapy.all import *
+from scapy.layers import http
 
 
 class BP_CVE(PyExploitDb):
@@ -13,7 +12,34 @@ class BP_CVE(PyExploitDb):
         super().__init__()
         self.bp_df = None
         self.debug = False
+        self.pcap_packet = {}
         self.openFile()
+        
+        self.read_pcap()
+        
+    def read_pcap(self):
+        print("Read pcap file...")
+        conf.contribs["http"]["auto_compression"] = False
+        pkts = sniff(offline="./data/tcpdump/S1E1.pcap", session=TCPSession)
+        req = [p for p in pkts if p.haslayer(http.HTTPRequest)]
+        for pkt in req:
+            try:
+                src = pkt['IP'].src
+                dst = pkt['IP'].dst
+                sport = pkt['TCP'].sport
+                dport = pkt['TCP'].dport
+                key = f'{src}:{sport}->{dst}:{dport}'
+                value = pkt
+                if key in self.pcap_packet:
+                    temp = self.pcap_packet[key]
+                    temp.append(value)
+                    self.pcap_packet[key] = temp
+                else :
+                    self.pcap_packet[key] = list(value)
+            except:
+                continue
+        print('Done read pcap')
+            
         
     def searchCve(self, cveSearch):
         if not cveSearch:
@@ -90,13 +116,36 @@ class BP_CVE(PyExploitDb):
         files.close()
         return result
         
+    def select_pcap(self): 
+        net_df = self.bp_df['Network'].to_frame()
+        net_df['Net_Exploit'] = net_df['Network'].apply(self.get_Network_Exploit)
+        print(net_df)
+        return net_df
+    
+    def get_Network_Exploit(self, x):
+        x_list = re.split('TCP|HTTP|IP', x)
+        xx_list = []
+        for x in x_list:
+            for y in x.split():
+                xx_list.append(y)
+        result = ""
+        for xx in xx_list:
+            if xx in self.pcap_packet:
+                pkts = self.pcap_packet[xx]
+                for pkt in pkts:
+                    temp = str(pkt['HTTPRequest'])[2:-1].replace('\\r\\n', '\n')
+                    #print(temp)
+                    result += temp+'----------------------------------\n'
+        return str(result)
 
+    
 
 def main():
     bp_cve = BP_CVE()
     #test
     bp_cve.read_Excel('data/TA-BP-CVE-TEST-attack_report-2022.07-arrange-jk.xlsx', 'arrange-jk')
-    ex_df = bp_cve.select_exploitdb()
+    #ex_df = bp_cve.select_exploitdb()
+    net_df = bp_cve.select_pcap()
     #product
     return
 
