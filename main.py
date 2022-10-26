@@ -1,3 +1,4 @@
+from heapq import merge
 import numpy as np
 import pandas as pd
 from pyExploitDb import PyExploitDb
@@ -75,8 +76,8 @@ class BP_CVE(PyExploitDb):
     def select_exploitdb(self):
         select_df = self.bp_df[self.bp_df['Reference'].str.contains('CVE|ExploitDb|www.exploit-db.com/exploits/', na=False)].reset_index(drop=False)
         select_df['Exploit'] = select_df['Reference'].apply(self.get_Exploit)
-        #print(select_df[select_df['Exploit'] != ''])
-        return select_df
+        #print(select_df[!isnan(select_df['Exploit'])])
+        return select_df[['index', 'Exploit']]
         
     def get_Exploit(self, x): 
         filename = []
@@ -100,7 +101,7 @@ class BP_CVE(PyExploitDb):
                 exploit = f.read()
                 return exploit
         
-        return ''
+        return np.NaN
         
     def getExploitDetails(self, num):
         files = open(self.currentPath + "/exploit-database/files_exploits.csv", encoding="utf-8")
@@ -119,7 +120,7 @@ class BP_CVE(PyExploitDb):
     def select_pcap(self): 
         net_df = self.bp_df['Network'].to_frame()
         net_df['Net_Exploit'] = net_df['Network'].apply(self.get_Network_Exploit)
-        print(net_df)
+        #print(net_df)
         return net_df
     
     def get_Network_Exploit(self, x):
@@ -138,14 +139,20 @@ class BP_CVE(PyExploitDb):
                     result += temp+'----------------------------------\n'
         return str(result)
 
-    
+    def merge_df(self, ex, net):
+        merge_df = pd.merge(self.bp_df, ex, left_index=True, right_on='index', how='left').reset_index(drop=True).drop(columns='index')
+        merge_df = pd.merge(merge_df, net, on='Network')
+        self.bp_df = merge_df
+        return
 
+    
 def main():
     bp_cve = BP_CVE()
     #test
     bp_cve.read_Excel('data/TA-BP-CVE-TEST-attack_report-2022.07-arrange-jk.xlsx', 'arrange-jk')
-    #ex_df = bp_cve.select_exploitdb()
+    ex_df = bp_cve.select_exploitdb()
     net_df = bp_cve.select_pcap()
+    bp_cve.merge_df(ex_df, net_df)
     #product
     return
 
