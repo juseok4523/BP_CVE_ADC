@@ -136,7 +136,7 @@ class BP_CVE(PyExploitDb):
                 for pkt in pkts:
                     temp = str(pkt['HTTPRequest'])[2:-1].replace('\\r\\n', '\n')
                     #print(temp)
-                    result += temp+'----------------------------------\n'
+                    result += temp+'\n----------------------------------\n'
         return str(result)
 
     def merge_df(self, ex, net):
@@ -145,6 +145,12 @@ class BP_CVE(PyExploitDb):
         self.bp_df = merge_df
         return
 
+    def print_excel(self, path):
+        self.bp_df.to_excel(
+            path,
+            engine='xlsxwriter'
+        )
+        
     
 def main():
     bp_cve = BP_CVE()
@@ -153,6 +159,7 @@ def main():
     ex_df = bp_cve.select_exploitdb()
     net_df = bp_cve.select_pcap()
     bp_cve.merge_df(ex_df, net_df)
+    bp_cve.print_excel('data/result.xlsx')
     #product
     return
 
