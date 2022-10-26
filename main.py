@@ -1,4 +1,5 @@
-from heapq import merge
+from sqlalchemy import create_engine
+import pymysql
 import numpy as np
 import pandas as pd
 from pyExploitDb import PyExploitDb
@@ -6,6 +7,7 @@ import csv
 import re
 from scapy.all import *
 from scapy.layers import http
+import sqlalchemy
 
 
 class BP_CVE(PyExploitDb):
@@ -40,7 +42,6 @@ class BP_CVE(PyExploitDb):
             except:
                 continue
         print('Done read pcap')
-            
         
     def searchCve(self, cveSearch):
         if not cveSearch:
@@ -69,6 +70,8 @@ class BP_CVE(PyExploitDb):
         excel_df = excel_df.drop(columns=['Strike Result', 'Permutations'])
         # rename col
         excel_df = excel_df.rename(columns={'Time of strike':'Time', 'Strike Name':'Name', 'Strike Reference':'Reference', 'Strike Tuples':'Network'})
+        #edit Name
+        excel_df['Name'] = excel_df['Name'].apply(lambda x: x.split('(')[0][:-1])
         self.bp_df = excel_df.sort_values('Time').reset_index(drop=True)
         #print(self.bp_df) #debug
         return
@@ -151,6 +154,24 @@ class BP_CVE(PyExploitDb):
             engine='xlsxwriter'
         )
         
+    def save_db(self, user, passwd, address, dbname):
+        mysql_conn_str = f'mysql+pymysql://{user}:{passwd}@{address}/{dbname}'
+        db_connection = create_engine(mysql_conn_str)
+        conn = db_connection.connect()
+        dtypesql = {
+            'Time':sqlalchemy.types.DECIMAL(10,7),
+            'Name':sqlalchemy.types.VARCHAR(255),
+            'Reference':sqlalchemy.types.TEXT,
+            'Network':sqlalchemy.types.VARCHAR(255),
+            'Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
+            'Net_Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT
+        }
+        self.bp_df.to_sql(name='BP_CVE', con=db_connection, if_exists='replace', index=False, dtype=dtypesql)
+        conn.execute(f"ALTER TABLE BP_CVE ADD PRIMARY KEY(Time);")
+        conn.close()
+        
+        return
+        
     
 def main():
     bp_cve = BP_CVE()
@@ -159,7 +180,7 @@ def main():
     ex_df = bp_cve.select_exploitdb()
     net_df = bp_cve.select_pcap()
     bp_cve.merge_df(ex_df, net_df)
-    bp_cve.print_excel('data/result.xlsx')
+    bp_cve.save_db('bp', '4523','127.0.0.1:3306','bp_cve')
     #product
     return
 
