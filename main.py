@@ -1,6 +1,4 @@
-from xml.dom.minidom import Element
 from sqlalchemy import create_engine
-import pymysql
 import numpy as np
 import pandas as pd
 from pyExploitDb import PyExploitDb
