@@ -1,4 +1,3 @@
-from sqlalchemy import create_engine
 import numpy as np
 import pandas as pd
 from pyExploitDb import PyExploitDb
@@ -7,6 +6,7 @@ import re
 from scapy.all import *
 from scapy.layers import http
 import sqlalchemy
+from sqlalchemy import create_engine
 import requests
 from bs4 import BeautifulSoup as bs
 import multiprocessing as mp
@@ -208,7 +208,7 @@ class BP_CVE(PyExploitDb):
         priority_df = self.bp_df
         priority_df['Priority'] = priority_df.apply(lambda row: self.apply_priority(row),axis=1)
         priority_df['CVE'] = priority_df['Reference'].apply(lambda x: self.select_cve(x))
-        priority_df = priority_df.sort_values(by=['Priority', 'CVSS', 'CVE'], ascending=[True, False, True]).drop(columns='CVE').reset_index(drop=True)
+        priority_df = priority_df.sort_values(by=['Priority', 'CVSS', 'CVE'], ascending=[True, False, False]).drop(columns='CVE').reset_index(drop=True)
         self.bp_df = priority_df
         return
     
@@ -238,7 +238,7 @@ class BP_CVE(PyExploitDb):
     
 def sample():
     bp_cve = BP_CVE()
-    bp_cve.read_Excel('data/TA-BP-CVE-TEST-attack_report-2022.07-arrange-jk.xlsx', 'arrange-jk')
+    bp_cve.read_Excel('data/TA-BP-CVE-TEST.xlsx', 'arrange-jk')
     
     print('select exploit..')
     ex_df = bp_cve.select_exploitdb()
