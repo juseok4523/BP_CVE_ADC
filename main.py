@@ -236,7 +236,13 @@ class BP_CVE(PyExploitDb):
         else :
             return np.NaN
         
-    
+    def count_priority(self):
+        first = len(self.bp_df.loc[self.bp_df['Priority'] == 1])
+        second = len(self.bp_df.loc[self.bp_df['Priority'] == 2])
+        third = len(self.bp_df.loc[self.bp_df['Priority'] == 3])
+        fourth = len(self.bp_df.loc[self.bp_df['Priority'] == 4])
+        print(f'priority count: \n    first: {first}\n    second: {second}\n    third: {third}\n    fourth: {fourth}')
+        
     
 def sample():
     bp_cve = BP_CVE()
@@ -255,6 +261,7 @@ def sample():
     bp_cve.print_excel('data/result.xlsx')
     print('write DB...')
     bp_cve.save_db('bp', '4523','127.0.0.1:3306','bp_cve')
+    bp_cve.count_priority()
     
 def main():
     parser = argparse.ArgumentParser(description='BP-CVE Data Collection Automation Tool')
