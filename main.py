@@ -152,7 +152,8 @@ class BP_CVE(PyExploitDb):
         return
 
     def print_excel(self, path):
-        excel_df = self.bp_df.drop(columns='Exploit')
+        excel_df = self.bp_df
+        excel_df['Exploit'] = excel_df['Exploit'].apply(lambda x: 'Y' if x == x else 'N')
         excel_df.to_excel(
             path,
             engine='xlsxwriter'
