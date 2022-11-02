@@ -78,7 +78,8 @@ class BP_CVE(PyExploitDb):
         return
     
     def select_exploitdb(self):
-        select_df = self.bp_df[self.bp_df['Reference'].str.contains('CVE|ExploitDb|www.exploit-db.com/exploits/', na=False)].reset_index(drop=False)
+        select_df = self.bp_df.copy()
+        select_df = select_df[select_df['Reference'].str.contains('CVE|ExploitDb|www.exploit-db.com/exploits/', na=False)].reset_index(drop=False)
         select_df['Exploit'] = select_df['Reference'].apply(self.get_Exploit)
         #print(select_df[!isnan(select_df['Exploit'])])
         return select_df[['index', 'Exploit']]
@@ -148,11 +149,11 @@ class BP_CVE(PyExploitDb):
     def merge_df(self, ex, net):
         merge_df = pd.merge(self.bp_df, ex, left_index=True, right_on='index', how='left').reset_index(drop=True).drop(columns='index')
         merge_df = pd.merge(merge_df, net, on='Network')
-        self.bp_df = merge_df
+        self.bp_df = merge_df.copy()
         return
 
     def print_excel(self, path):
-        excel_df = self.bp_df
+        excel_df = self.bp_df.copy()
         excel_df['Exploit'] = excel_df['Exploit'].apply(lambda x: 'Y' if x == x else 'N')
         excel_df.to_excel(
             path,
@@ -173,7 +174,7 @@ class BP_CVE(PyExploitDb):
             'CVSS':sqlalchemy.types.DECIMAL(3,1),
             'Priority':sqlalchemy.types.INT
         }
-        out_df = self.bp_df  
+        out_df = self.bp_df.copy()  
         out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0][:-1])
         out_df.to_sql(name='BP_CVE', con=db_connection, if_exists='replace', index=False, dtype=dtypesql)
         conn.execute(f"ALTER TABLE BP_CVE ADD PRIMARY KEY(Time);")
@@ -182,13 +183,13 @@ class BP_CVE(PyExploitDb):
         return
         
     def select_multiprocessing(self, n_cores=8):
-        cvss_df = self.bp_df
+        cvss_df = self.bp_df.copy()
         df_split = np.array_split(cvss_df, n_cores)
         pool = mp.Pool(n_cores)
         cvss_df = pd.concat(pool.map(self.apply_cvss, df_split))
         pool.close()
         pool.join()
-        self.bp_df = cvss_df
+        self.bp_df = cvss_df.copy()
         return
     
     def apply_cvss(self, df):
@@ -206,11 +207,11 @@ class BP_CVE(PyExploitDb):
             return np.NaN
             
     def prioritize(self):
-        priority_df = self.bp_df
+        priority_df = self.bp_df.copy()
         priority_df['Priority'] = priority_df.apply(lambda row: self.apply_priority(row),axis=1)
         priority_df['CVE'] = priority_df['Reference'].apply(lambda x: self.select_cve(x))
         priority_df = priority_df.sort_values(by=['Priority', 'CVSS', 'CVE'], ascending=[True, False, False]).drop(columns='CVE').reset_index(drop=True)
-        self.bp_df = priority_df
+        self.bp_df = priority_df.copy()
         return
     
     def apply_priority(self, x):
