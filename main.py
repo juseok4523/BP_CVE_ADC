@@ -282,7 +282,6 @@ def sample():
     
     print('select exploit..')
     ex_df = bp_cve.select_exploitdb()
-    print(ex_df)
     net_df = bp_cve.select_pcap()
     print('merge dataframe..')
     bp_cve.merge_df(ex_df, net_df)
