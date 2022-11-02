@@ -22,7 +22,49 @@ class BP_CVE(PyExploitDb):
         self.pcap_packet = {}
         self.openFile()
         self.read_pcap()
+    
+    #overriding func
+    def searchCve(self, cveSearch):
+        if not cveSearch:
+            return []
+        cveSearch = cveSearch.upper()
+        #print(cveSearch)
+        if cveSearch in self.cveToExploitMap:
+            if self.debug == True:
+                print("Found")
+            cveData = self.getCveDetails(cveSearch)
+            if cveData:
+                return cveData
+            else:
+                return cveSearch
+        return []
         
+    def getCveDetails(self, cveSearch):
+        files = open(self.currentPath + "/exploit-database/files_exploits.csv", encoding="utf-8")
+        reader = csv.reader(files)
+        next(reader)
+        result = {'edbid':[], 'exploit':[], 'date':[], 'author':[], 'platform':[], 'type':[], 'port':[]}
+        found = False
+        for row in reader:
+            edb, fileName, description, date, author, platform, exploitType, port = tuple(row)
+            if edb in self.cveToExploitMap[cveSearch]:
+                found = True
+                result['edbid'].append(edb)
+                result['exploit'].append(self.exploitDbPath + "/" + fileName)
+                result['date'].append(date)
+                result['author'].append(author)
+                result['platform'].append(platform)
+                result['type'].append(exploitType)
+                
+                if port != "0":
+                    result['port'].append(port)
+        if not found:
+            if self.debug == True:
+                print("ERROR - No EDB Id found")
+        files.close()
+        return result
+    
+    #create code   
     def read_pcap(self):
         print("Read pcap file...")
         conf.contribs["http"]["auto_compression"] = False
@@ -46,21 +88,6 @@ class BP_CVE(PyExploitDb):
                 continue
         print('Done read pcap')
         
-    def searchCve(self, cveSearch):
-        if not cveSearch:
-            return []
-        cveSearch = cveSearch.upper()
-        #print(cveSearch)
-        if cveSearch in self.cveToExploitMap:
-            if self.debug == True:
-                print("Found")
-            cveData = self.getCveDetails(cveSearch)
-            if cveData:
-                return cveData
-            else:
-                return cveSearch
-        return []
-
     def read_Excel(self, filename, sheet_name):
         excel_df = pd.read_excel(filename,
                              index_col=None, 
@@ -85,28 +112,33 @@ class BP_CVE(PyExploitDb):
         return select_df[['index', 'Exploit']]
         
     def get_Exploit(self, x): 
-        filename = []
-        if "ExploitDb" in x :
-            Exploit_num = x.split('ExploitDb')[1].split()[0]
-            filename = self.getExploitDetails(Exploit_num)['exploit']
-        
-        elif "www.exploit-db.com/exploits/" in x:
-            Exploit_num = x.split('www.exploit-db.com/exploits/')[1].split('/')[0].split()[0]
-            filename = self.getExploitDetails(Exploit_num)['exploit']
+        exploit_nums = []
+        x_list = x.split(')')
+        for xx in x_list:
+            if "ExploitDb" in xx :
+                Exploit_num = x.split('ExploitDb')[1].split()[0]
+                exploit_nums.append(Exploit_num)
+            
+            elif "www.exploit-db.com/exploits/" in xx:
+                Exploit_num = x.split('www.exploit-db.com/exploits/')[1].split('/')[0].split()[0]
+                exploit_nums.append(Exploit_num)
+                    
+            elif "CVE" in xx:
+                cve_num = 'CVE-'+ x.split('CVE')[1].split()[0]
+                result = self.searchCve(cve_num)
+                if len(result) != 0:
+                    for i in result['edbid']:
+                        exploit_nums.append(i)
                 
-        elif "CVE" in x:
-            Exploit_num = 'CVE-'+ x.split('CVE')[1].split()[0]
-            result = self.searchCve(Exploit_num)
-            if len(result) != 0:
-                filename = result['exploit']
-                
-        if len(filename) > 5:
-            filename = filename.replace('\\', '\\\\')
-            with open(filename, 'r', encoding='UTF8') as f:
-                exploit = f.read()
-                return exploit
+        exploit_num = ""
+        if len(exploit_nums) == 0:
+            return np.NaN
         
-        return np.NaN
+        for num in exploit_nums:
+            exploit_num += f"www.exploit-db.com/exploits/{num} \n"
+        return exploit_num
+        
+        
         
     def getExploitDetails(self, num):
         files = open(self.currentPath + "/exploit-database/files_exploits.csv", encoding="utf-8")
@@ -154,7 +186,7 @@ class BP_CVE(PyExploitDb):
 
     def print_excel(self, path):
         excel_df = self.bp_df.copy()
-        excel_df['Exploit'] = excel_df['Exploit'].apply(lambda x: 'Y' if x == x else 'N')
+        #excel_df['Exploit'] = excel_df['Exploit'].apply(lambda x: 'Y' if x == x else 'N')
         excel_df.to_excel(
             path,
             engine='xlsxwriter'
@@ -250,6 +282,7 @@ def sample():
     
     print('select exploit..')
     ex_df = bp_cve.select_exploitdb()
+    print(ex_df)
     net_df = bp_cve.select_pcap()
     print('merge dataframe..')
     bp_cve.merge_df(ex_df, net_df)
