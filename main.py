@@ -195,19 +195,20 @@ class BP_CVE(PyExploitDb):
         db_connection = create_engine(mysql_conn_str)
         conn = db_connection.connect()
         dtypesql = {
-            'Time':sqlalchemy.types.DECIMAL(10,7),
+            'Id':sqlalchemy.types.VARCHAR(16),
             'Name':sqlalchemy.types.VARCHAR(255),
             'Reference':sqlalchemy.types.TEXT,
             'Network':sqlalchemy.types.VARCHAR(255),
             'Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
             'Net_Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
             'CVSS':sqlalchemy.types.DECIMAL(3,1),
-            'Priority':sqlalchemy.types.INT
+            'Priority':sqlalchemy.types.INT,
+            'CVE':sqlalchemy.types.VARCHAR(40)
         }
         out_df = self.bp_df.copy()  
         out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0][:-1])
         out_df.to_sql(name='BP_CVE', con=db_connection, if_exists='replace', index=False, dtype=dtypesql)
-        conn.execute(f"ALTER TABLE BP_CVE ADD PRIMARY KEY(Time);")
+        conn.execute(f"ALTER TABLE BP_CVE ADD PRIMARY KEY(Id);")
         conn.close()
         
         return
@@ -273,6 +274,15 @@ class BP_CVE(PyExploitDb):
         fourth = len(self.bp_df.loc[self.bp_df['Priority'] == 4])
         print(f'priority count: \n    first: {first}\n    second: {second}\n    third: {third}\n    fourth: {fourth}')
         
+    def regive_ID(self, bp_num):
+        temp_df = self.bp_df.copy()
+        temp_df['Id'] = temp_df.apply(lambda row: f'M-BP-{bp_num}-{row["Priority"]}-{str(row.name).zfill(4)}', axis=1)
+        temp_df = temp_df.drop(columns=['Time'])[['Id', 'Name', 'Reference', 'Network','Exploit','Net_Exploit','CVSS', 'Priority']]
+        
+        print(temp_df)
+        self.bp_df = temp_df.copy()
+        
+        
     
 def sample():
     bp_cve = BP_CVE()
@@ -287,6 +297,8 @@ def sample():
     bp_cve.select_multiprocessing()
     print('prioritize...')
     bp_cve.prioritize()
+    print('regive ID...')
+    bp_cve.regive_ID('2204')
     print('make excel...')
     bp_cve.print_excel('data/result.xlsx')
     print('write DB...')
@@ -298,6 +310,7 @@ def main():
     parser.add_argument('-f', dest='bpcveexcel',help='read BP-CVE xlsx file path', required=True)
     parser.add_argument('--sheet', dest='bpcveexcelsheet',help='read BP-CVE xlsx file sheet name',required=True)
     parser.add_argument('-o', '--output', dest='output', help='outfile path', default='data/result.xlsx', required=False)
+    parser.add_argument('--bp-num',  dest='bpnum', help='bp version(date)', required=True)
     parser.add_argument('--db-user', dest='dbuser', help='MySQL DataBase User name', required=True)
     parser.add_argument('--db-passwd', dest='dbpasswd', help='MySQL DataBase Password', required=True)
     parser.add_argument('--db-host', dest='dbhost', help='MySQL DataBase Host(:port)', required=True)
@@ -318,6 +331,8 @@ def main():
     bp_cve.select_multiprocessing()
     print('prioritize...')
     bp_cve.prioritize()
+    print('regive ID...')
+    bp_cve.regive_ID(args.bpnum)
     print('make excel...')
     bp_cve.print_excel(args.output)
     print('write DB...')
