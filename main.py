@@ -112,33 +112,31 @@ class BP_CVE(PyExploitDb):
         return select_df[['index', 'Exploit']]
         
     def get_Exploit(self, x): 
-        exploit_nums = []
+        exploit_nums = {}
         x_list = x.split(')')
         for xx in x_list:
             if "ExploitDb" in xx :
                 Exploit_num = x.split('ExploitDb')[1].split()[0]
-                exploit_nums.append(Exploit_num)
+                exploit_nums[Exploit_num] = None
             
             elif "www.exploit-db.com/exploits/" in xx:
                 Exploit_num = x.split('www.exploit-db.com/exploits/')[1].split('/')[0].split()[0]
-                exploit_nums.append(Exploit_num)
+                exploit_nums[Exploit_num] = None
                     
             elif "CVE" in xx:
                 cve_num = 'CVE-'+ x.split('CVE')[1].split()[0]
                 result = self.searchCve(cve_num)
                 if len(result) != 0:
-                    for i in result['edbid']:
-                        exploit_nums.append(i)
+                    for Exploit_num in result['edbid']:
+                        exploit_nums[Exploit_num] = None
                 
         exploit_num = ""
         if len(exploit_nums) == 0:
             return np.NaN
         
-        for num in exploit_nums:
-            exploit_num += f"www.exploit-db.com/exploits/{num} \n"
+        for num in exploit_nums.keys():
+            exploit_num += f"www.exploit-db.com/exploits/{num}  "
         return exploit_num
-        
-        
         
     def getExploitDetails(self, num):
         files = open(self.currentPath + "/exploit-database/files_exploits.csv", encoding="utf-8")
