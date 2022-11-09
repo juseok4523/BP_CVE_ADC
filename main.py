@@ -240,7 +240,7 @@ class BP_CVE(PyExploitDb):
         priority_df = self.bp_df.copy()
         priority_df['Priority'] = priority_df.apply(lambda row: self.apply_priority(row),axis=1)
         priority_df['CVE'] = priority_df['Reference'].apply(lambda x: self.select_cve(x))
-        priority_df = priority_df.sort_values(by=['Priority', 'CVSS', 'CVE'], ascending=[True, False, False]).drop(columns='CVE').reset_index(drop=True)
+        priority_df = priority_df.sort_values(by=['Priority', 'CVE'], ascending=[True, False]).reset_index(drop=True)
         self.bp_df = priority_df.copy()
         return
     
