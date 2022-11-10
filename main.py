@@ -276,10 +276,11 @@ class BP_CVE(PyExploitDb):
         
     def regive_ID(self, bp_num):
         temp_df = self.bp_df.copy()
-        temp_df['Id'] = temp_df.apply(lambda row: f'M-BP-{bp_num}-{row["Priority"]}-{str(row.name).zfill(4)}', axis=1)
-        temp_df = temp_df.drop(columns=['Time'])[['Id', 'Name', 'Reference', 'Network','Exploit','Net_Exploit','CVSS', 'Priority']]
-        
-        print(temp_df)
+        temp_df['Id'] = temp_df.apply(lambda row: f'M-BP-{bp_num}-{row["Priority"]}-{str(row.name+1).zfill(4)}', axis=1)
+        temp_df = temp_df.drop(columns=['Time'])
+        old_col = temp_df.columns[:-1].to_list()
+        new_col = ['Id'] + old_col
+        temp_df = temp_df[new_col]
         self.bp_df = temp_df.copy()
         
         
