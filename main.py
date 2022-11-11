@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup as bs
 import multiprocessing as mp
 import argparse
 from warnings import filterwarnings
+from datetime import datetime
 filterwarnings("ignore")
 
 class BP_CVE(PyExploitDb):
@@ -184,7 +185,12 @@ class BP_CVE(PyExploitDb):
 
     def print_excel(self, path):
         excel_df = self.bp_df.copy()
-        #excel_df['Exploit'] = excel_df['Exploit'].apply(lambda x: 'Y' if x == x else 'N')
+        now = datetime.now()
+        filename = f"result-{now.strftime('%Y-%m-%d_%H_%M_%S')}.xlsx"
+        if path[-1] != '/' :
+            path +='/'
+        path += filename
+        print(path)
         excel_df.to_excel(
             path,
             engine='xlsxwriter'
@@ -301,16 +307,16 @@ def sample():
     print('regive ID...')
     bp_cve.regive_ID('2204')
     print('make excel...')
-    bp_cve.print_excel('data/result.xlsx')
+    bp_cve.print_excel('data/')
     print('write DB...')
-    bp_cve.save_db('bp', '4523','127.0.0.1:3306','bp_cve')
+    bp_cve.save_db('bp', '4523','10.0.0.206:3306','bp_cve')
     bp_cve.count_priority()
     
 def main():
     parser = argparse.ArgumentParser(description='BP-CVE Data Collection Automation Tool')
     parser.add_argument('-f', dest='bpcveexcel',help='read BP-CVE xlsx file path', required=True)
     parser.add_argument('--sheet', dest='bpcveexcelsheet',help='read BP-CVE xlsx file sheet name',required=True)
-    parser.add_argument('-o', '--output', dest='output', help='outfile path', default='data/result.xlsx', required=False)
+    parser.add_argument('-o', '--output', dest='output', help='outfile directory path (defalut data/)', default='data/', required=False)
     parser.add_argument('--bp-num',  dest='bpnum', help='bp version(date)', required=True)
     parser.add_argument('--db-user', dest='dbuser', help='MySQL DataBase User name', required=True)
     parser.add_argument('--db-passwd', dest='dbpasswd', help='MySQL DataBase Password', required=True)
