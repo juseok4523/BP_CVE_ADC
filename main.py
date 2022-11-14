@@ -13,6 +13,7 @@ import multiprocessing as mp
 import argparse
 from warnings import filterwarnings
 from datetime import datetime
+import git
 filterwarnings("ignore")
 
 class BP_CVE(PyExploitDb):
@@ -66,6 +67,7 @@ class BP_CVE(PyExploitDb):
         return result
     
     #create code   
+    #init code
     def read_pcap(self):
         print("Read pcap file...")
         conf.contribs["http"]["auto_compression"] = False
@@ -89,6 +91,30 @@ class BP_CVE(PyExploitDb):
                 continue
         print('Done read pcap')
         
+    def get_PoC(self):
+        self.PoC_in_Github_path = "D:\\02.Analyze_Vulnerabilities\\vuln source\\PoC-in-GitHub"
+        self.trickest_cve_path = "D:\\02.Analyze_Vulnerabilities\\vuln source\\trickest-cve"
+        #self.PoC_in_Github_path = os.path.dirname(os.path.abspath(__file__)) + "/data/PoC-in-Github/"
+        #self.trickest_cve_path = os.path.dirname(os.path.abspath(__file__)) + "/data/trickest-cve/"
+        
+        
+        #clone PoC-in-Github
+        if not os.path.isdir(self.PoC_in_Github_path):
+            git.Repo.clone_from("https://github.com/nomi-sec/PoC-in-GitHub.git", self.PoC_in_Github_path)
+        else :
+            git.Git(self.PoC_in_Github_path).pull('origin', 'master')
+        
+        #clone trickest-cve
+        if not os.path.isdir(self.trickest_cve_path):
+            git.Repo.clone_from("https://github.com/trickest/cve.git", self.trickest_cve_path)
+        else :
+            git.Git(self.trickest_cve_path).pull('origin', 'master')
+            
+        #map cve-PoC
+         
+        return
+        
+    #func        
     def read_Excel(self, filename, sheet_name):
         excel_df = pd.read_excel(filename,
                              index_col=None, 
