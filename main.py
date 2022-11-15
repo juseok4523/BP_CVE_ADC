@@ -14,6 +14,7 @@ import argparse
 from warnings import filterwarnings
 from datetime import datetime
 import git
+import json
 filterwarnings("ignore")
 
 class BP_CVE(PyExploitDb):
@@ -24,6 +25,7 @@ class BP_CVE(PyExploitDb):
         self.pcap_packet = {}
         self.openFile()
         self.read_pcap()
+        self.get_PoC()
     
     #overriding func
     def searchCve(self, cveSearch):
@@ -48,7 +50,7 @@ class BP_CVE(PyExploitDb):
         result = {'edbid':[], 'exploit':[], 'date':[], 'author':[], 'platform':[], 'type':[], 'port':[]}
         found = False
         for row in reader:
-            edb, fileName, description, date, author, platform, exploitType, port = tuple(row)
+            edb, fileName, description, date, author, exploitType, platform, port = tuple(row)[:8]
             if edb in self.cveToExploitMap[cveSearch]:
                 found = True
                 result['edbid'].append(edb)
@@ -65,6 +67,25 @@ class BP_CVE(PyExploitDb):
                 print("ERROR - No EDB Id found")
         files.close()
         return result
+    
+    def openFile(self, exploitMap = "cveToEdbid.json", encoding="utf-8"):
+        if not os.path.isdir(self.exploitDbPath):
+            print("Cloning exploit-database repository")
+            git.Repo.clone_from("https://gitlab.com/exploit-database/exploitdb.git", self.exploitDbPath)
+            print("Updating db...")
+            self.updateDb()
+        else:
+            if self.autoUpdate == True:
+                print("Pulling exploit-database updates...")
+                git.Git(self.exploitDbPath).pull('origin', 'main')
+                print("Updating db...")
+                self.updateDb()
+            print("Loading database...")
+            with open(self.currentPath + "/" + exploitMap, encoding="utf-8") as fileData:
+                cveToExploitMap = json.load(fileData)
+                self.cveToExploitMap = cveToExploitMap
+                if self.debug == True:
+                    print(self.cveToExploitMap)
     
     #create code   
     #init code
@@ -92,26 +113,26 @@ class BP_CVE(PyExploitDb):
         print('Done read pcap')
         
     def get_PoC(self):
-        self.PoC_in_Github_path = "D:\\02.Analyze_Vulnerabilities\\vuln source\\PoC-in-GitHub"
+        print('Get PoC Data in Github...')
+        self.PoC_in_Github_path = "D:/02.Analyze_Vulnerabilities/vuln source/PoC-in-GitHub"
         self.trickest_cve_path = "D:\\02.Analyze_Vulnerabilities\\vuln source\\trickest-cve"
+        self.PoC_in_Github_link = "https://github.com/nomi-sec/PoC-in-GitHub"
+        self.trickest_cve_link = "https://github.com/trickest/cve"
         #self.PoC_in_Github_path = os.path.dirname(os.path.abspath(__file__)) + "/data/PoC-in-Github/"
         #self.trickest_cve_path = os.path.dirname(os.path.abspath(__file__)) + "/data/trickest-cve/"
         
-        
         #clone PoC-in-Github
         if not os.path.isdir(self.PoC_in_Github_path):
-            git.Repo.clone_from("https://github.com/nomi-sec/PoC-in-GitHub.git", self.PoC_in_Github_path)
+            git.Repo.clone_from(self.PoC_in_Github_link+".git", self.PoC_in_Github_path)
         else :
             git.Git(self.PoC_in_Github_path).pull('origin', 'master')
         
         #clone trickest-cve
         if not os.path.isdir(self.trickest_cve_path):
-            git.Repo.clone_from("https://github.com/trickest/cve.git", self.trickest_cve_path)
+            git.Repo.clone_from(self.trickest_cve_link+".git", self.trickest_cve_path)
         else :
-            git.Git(self.trickest_cve_path).pull('origin', 'master')
-            
-        #map cve-PoC
-         
+            git.Git(self.trickest_cve_path).pull('origin', 'main')
+        
         return
         
     #func        
@@ -235,7 +256,8 @@ class BP_CVE(PyExploitDb):
             'Net_Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
             'CVSS':sqlalchemy.types.DECIMAL(3,1),
             'Priority':sqlalchemy.types.INT,
-            'CVE':sqlalchemy.types.VARCHAR(40)
+            'CVE':sqlalchemy.types.VARCHAR(40),
+            'Github_PoC':sqlalchemy.dialects.mysql.MEDIUMTEXT
         }
         out_df = self.bp_df.copy()  
         out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0][:-1])
@@ -315,7 +337,29 @@ class BP_CVE(PyExploitDb):
         temp_df = temp_df[new_col]
         self.bp_df = temp_df.copy()
         
+    def get_github_PoC(self):
+        poc_df = self.bp_df.copy()
         
+        poc_df['Github_PoC'] = poc_df['CVE'].apply(lambda x: self.apply_gitpoc(x) if x == x else np.NaN)
+        self.bp_df = poc_df.copy()
+        return
+    
+    def apply_gitpoc(self, x):
+        year = x.split('-')[0]
+        result = ""
+        #PoC-in-Github
+        if os.path.exists(self.PoC_in_Github_path+"/"+year+"/CVE-"+x+".json") :
+                result += self.PoC_in_Github_link+'/blob/master/'+year+"/CVE-"+x+".json"
+            
+        result += " "
+        #trickest-cve
+        if os.path.exists(self.trickest_cve_path+"/"+year+"/CVE-"+x+".md") :
+                result += self.trickest_cve_link+'/blob/main/'+year+"/CVE-"+x+".md"
+        
+        if len(result) != 0:
+            return result
+        return np.NaN
+    
     
 def sample():
     bp_cve = BP_CVE()
@@ -332,11 +376,15 @@ def sample():
     bp_cve.prioritize()
     print('regive ID...')
     bp_cve.regive_ID('2204')
+    print('get PoC in Github...')
+    bp_cve.get_github_PoC()
+    
     print('make excel...')
     bp_cve.print_excel('data/')
     print('write DB...')
     bp_cve.save_db('bp', '4523','10.0.0.206:3306','bp_cve')
     bp_cve.count_priority()
+    
     
 def main():
     parser = argparse.ArgumentParser(description='BP-CVE Data Collection Automation Tool')
