@@ -351,9 +351,9 @@ class BP_CVE(PyExploitDb):
         if os.path.exists(self.PoC_in_Github_path+"/"+year+"/CVE-"+x+".json") :
                 result += self.PoC_in_Github_link+'/blob/master/'+year+"/CVE-"+x+".json"
             
-        result += " "
         #trickest-cve
         if os.path.exists(self.trickest_cve_path+"/"+year+"/CVE-"+x+".md") :
+                result += " "
                 result += self.trickest_cve_link+'/blob/main/'+year+"/CVE-"+x+".md"
         
         if len(result) != 0:
