@@ -237,7 +237,6 @@ class BP_CVE(PyExploitDb):
         if path[-1] != '/' :
             path +='/'
         path += filename
-        print(path)
         excel_df.to_excel(
             path,
             engine='xlsxwriter'
