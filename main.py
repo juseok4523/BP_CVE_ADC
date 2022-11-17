@@ -360,6 +360,26 @@ class BP_CVE(PyExploitDb):
             return result
         return np.NaN
     
+    def get_db(self, user, passwd, address, dbname, tablename):
+        db_df = pd.read_sql_table(tablename, f'mysql+pymysql://{user}:{passwd}@{address}/{dbname}')
+        return db_df
+    
+    def compare_df(self, db_df):
+        # compare Github_PoC
+        temp_bp_df = self.bp_df.copy()
+        if not db_df[['Github_PoC']].equals(temp_bp_df[['Github_PoC']]):
+            git_db_s = db_df['Github_PoC'].fillna("")
+            git_bp_s = self.bp_df['Github_PoC'].fillna("")
+            git_eq_s = ~git_bp_s.eq(git_db_s, fill_value=0)
+            db_eq_df = db_df[git_eq_s].loc[:,['Id', 'Github_PoC']]
+            bp_eq_df = temp_bp_df[git_eq_s].loc[:,['Id', 'Github_PoC']]
+            compare_df = pd.merge(db_eq_df, bp_eq_df, how="outer", on='Id')
+            compare_df = compare_df.rename(columns={'Github_PoC_x':'Before', 'Github_PoC_y':'After'})
+            print(compare_df)
+        else :
+            print('Not Add Github_PoC')
+        return
+    
     
 def sample():
     bp_cve = BP_CVE()
@@ -378,6 +398,10 @@ def sample():
     bp_cve.regive_ID('2204')
     print('get PoC in Github...')
     bp_cve.get_github_PoC()
+    
+    print('Compare DB and bp_df...')
+    db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE')
+    bp_cve.compare_df(db_df)
     
     print('make excel...')
     bp_cve.print_excel('data/')
@@ -414,6 +438,10 @@ def main():
     bp_cve.prioritize()
     print('regive ID...')
     bp_cve.regive_ID(args.bpnum)
+    print('Compare DB and bp_df...')
+    db_df = bp_cve.get_db(args.dbuser, args.dbpasswd, args.dbhost, args.db, 'BP_CVE')
+    bp_cve.compare_df(db_df)
+    
     print('make excel...')
     bp_cve.print_excel(args.output)
     print('write DB...')
