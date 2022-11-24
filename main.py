@@ -339,7 +339,7 @@ class BP_CVE(PyExploitDb):
     def get_github_PoC(self):
         poc_df = self.bp_df.copy()
         
-        poc_df['Github_PoC'] = poc_df['CVE'].apply(lambda x: self.apply_gitpoc(x) if x == x else np.NaN)
+        poc_df['Github_PoC'] = poc_df['CVE'].apply(lambda x: self.apply_gitpoc(x) if not pd.isnull(x) else np.NaN)
         self.bp_df = poc_df.copy()
         return
     
@@ -382,17 +382,7 @@ class BP_CVE(PyExploitDb):
             print('Not Add Github_PoC')
         return
     
-    def read_older_excel(self, dir):
-        dir_list = os.listdir(dir)
-        now = datetime.datetime.now()-datetime.timedelta(days=1)
-        filename = [s for s in dir_list if now.strftime('%Y-%m-%d') in s]
-        excel_df = pd.read_excel(dir+filename[-1],
-                             index_col=0, 
-                             engine="openpyxl")
-        self.bp_df = excel_df.copy()
-
         
-    
 def sample():
     bp_cve = BP_CVE()
     
@@ -416,8 +406,9 @@ def sample():
         bp_cve.get_github_PoC()
     else :
         print("db is not empty!")
-        print("read older excel...")
-        bp_cve.read_older_excel('data/')
+        bp_cve.bp_df = db_df.copy()
+        print('get PoC in Github...')
+        bp_cve.get_github_PoC()
         print('Compare DB and bp_df...')
         bp_cve.compare_df(db_df)
     
@@ -431,7 +422,7 @@ def sample():
 def main():
     parser = argparse.ArgumentParser(description='BP-CVE Data Collection Automation Tool')
     parser.add_argument('-f', dest='bpcveexcel',help='read BP-CVE xlsx file path', required=True)
-    parser.add_argument('--sheet', dest='bpcveexcelsheet',help='read BP-CVE xlsx file sheet name',required=True)
+    parser.add_argument('--sheet', dest='bpcveexcelsheet',help='read BP-CVE xlsx file sheet name')
     parser.add_argument('-o', '--output', dest='output', help='outfile directory path (defalut data/)', default='data/', required=False)
     parser.add_argument('--bp-num',  dest='bpnum', help='bp version(date)', required=True)
     parser.add_argument('--db-user', dest='dbuser', help='MySQL DataBase User name', required=True)
