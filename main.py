@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup as bs
 import multiprocessing as mp
 import argparse
 from warnings import filterwarnings
-from datetime import datetime
+import datetime
 import git
 import json
 filterwarnings("ignore")
@@ -232,7 +232,7 @@ class BP_CVE(PyExploitDb):
 
     def print_excel(self, path):
         excel_df = self.bp_df.copy()
-        now = datetime.now()
+        now = datetime.datetime.now()
         filename = f"result-{now.strftime('%Y-%m-%d_%H_%M_%S')}.xlsx"
         if path[-1] != '/' :
             path +='/'
@@ -382,28 +382,44 @@ class BP_CVE(PyExploitDb):
             print('Not Add Github_PoC')
         return
     
+    def read_older_excel(self, dir):
+        dir_list = os.listdir(dir)
+        now = datetime.datetime.now()-datetime.timedelta(days=1)
+        filename = [s for s in dir_list if now.strftime('%Y-%m-%d') in s]
+        excel_df = pd.read_excel(dir+filename[-1],
+                             index_col=0, 
+                             engine="openpyxl")
+        self.bp_df = excel_df.copy()
+
+        
     
 def sample():
     bp_cve = BP_CVE()
-    bp_cve.read_Excel('data/TA-BP-CVE-TEST.xlsx', 'arrange-jk')
     
-    print('select exploit..')
-    ex_df = bp_cve.select_exploitdb()
-    net_df = bp_cve.select_pcap()
-    print('merge dataframe..')
-    bp_cve.merge_df(ex_df, net_df)
-    print('get CVSS...')
-    bp_cve.select_multiprocessing()
-    print('prioritize...')
-    bp_cve.prioritize()
-    print('regive ID...')
-    bp_cve.regive_ID('2204')
-    print('get PoC in Github...')
-    bp_cve.get_github_PoC()
-    
-    print('Compare DB and bp_df...')
+    print('Check DB...')
     db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE')
-    bp_cve.compare_df(db_df)
+    if db_df.empty:
+        print("db is empty!")
+        bp_cve.read_Excel('data/TA-BP-CVE-TEST.xlsx', 'arrange-jk')
+        print('select exploit..')
+        ex_df = bp_cve.select_exploitdb()
+        net_df = bp_cve.select_pcap()
+        print('merge dataframe..')
+        bp_cve.merge_df(ex_df, net_df)
+        print('get CVSS...')
+        bp_cve.select_multiprocessing()
+        print('prioritize...')
+        bp_cve.prioritize()
+        print('regive ID...')
+        bp_cve.regive_ID('2204')
+        print('get PoC in Github...')
+        bp_cve.get_github_PoC()
+    else :
+        print("db is not empty!")
+        print("read older excel...")
+        bp_cve.read_older_excel('data/')
+        print('Compare DB and bp_df...')
+        bp_cve.compare_df(db_df)
     
     print('make excel...')
     bp_cve.print_excel('data/')
