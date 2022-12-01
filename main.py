@@ -248,7 +248,7 @@ class BP_CVE(PyExploitDb):
         conn = db_connection.connect()
         dtypesql = {
             'Id':sqlalchemy.types.VARCHAR(16),
-            'Name':sqlalchemy.types.VARCHAR(255),
+            'Name':sqlalchemy.types.VARCHAR(400),
             'Reference':sqlalchemy.types.TEXT,
             'Network':sqlalchemy.types.VARCHAR(255),
             'Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
