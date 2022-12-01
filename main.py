@@ -374,8 +374,8 @@ class BP_CVE(PyExploitDb):
             bp_eq_df = temp_bp_df[git_eq_s].loc[:,['Id', 'Github_PoC']]
             compare_df = pd.merge(db_eq_df, bp_eq_df, how="outer", on='Id').rename(columns={'Github_PoC_x':'Before', 'Github_PoC_y':'After'})
             with open('data/compare_log.txt', 'a') as file:
-                now = datetime.now()
-                compare_df.apply(lambda row: file.write(f"Update {now.strftime('%Y-%m-%d_%H_%M_%S')} : Before \"{row['Before']}\" -> After \"{row['After']}\"\n"), axis=1)
+                now = datetime.datetime.now()
+                compare_df.apply(lambda row: file.write(f"Update {now.strftime('%Y-%m-%d_%H_%M_%S')} - {row['Name']} : Before \"{row['Before']}\" -> After \"{row['After']}\"\n"), axis=1)
             print(compare_df)
                 
         else :
