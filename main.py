@@ -248,7 +248,7 @@ class BP_CVE(PyExploitDb):
         conn = db_connection.connect()
         dtypesql = {
             'Id':sqlalchemy.types.VARCHAR(16),
-            'Name':sqlalchemy.types.VARCHAR(400),
+            'Name':sqlalchemy.types.TEXT,
             'Reference':sqlalchemy.types.TEXT,
             'Network':sqlalchemy.types.VARCHAR(255),
             'Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
@@ -375,7 +375,7 @@ class BP_CVE(PyExploitDb):
             compare_df = pd.merge(db_eq_df, bp_eq_df, how="outer", on='Id').rename(columns={'Github_PoC_x':'Before', 'Github_PoC_y':'After'})
             with open('data/compare_log.txt', 'a') as file:
                 now = datetime.datetime.now()
-                compare_df.apply(lambda row: file.write(f"Update {now.strftime('%Y-%m-%d_%H_%M_%S')} - {row['Name']} : Before \"{row['Before']}\" -> After \"{row['After']}\"\n"), axis=1)
+                compare_df.apply(lambda row: file.write(f"Update {now.strftime('%Y-%m-%d_%H_%M_%S')} - {row['Id']} : Before \"{row['Before']}\" -> After \"{row['After']}\"\n"), axis=1)
             print(compare_df)
                 
         else :
