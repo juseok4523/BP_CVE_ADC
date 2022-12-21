@@ -360,8 +360,13 @@ class BP_CVE(PyExploitDb):
         return np.NaN
     
     def get_db(self, user, passwd, address, dbname, tablename):
-        db_df = pd.read_sql_table(tablename, f'mysql+pymysql://{user}:{passwd}@{address}/{dbname}')
-        return db_df
+        try: 
+            db_df = pd.read_sql_table(tablename, f'mysql+pymysql://{user}:{passwd}@{address}/{dbname}')
+            return db_df
+        except Exception as e:
+            print(e)
+            return None
+        
     
     def compare_df(self, db_df):
         # compare Github_PoC
@@ -388,7 +393,7 @@ def sample():
     
     print('Check DB...')
     db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE')
-    if db_df.empty:
+    if db_df is None or db_df.empty:
         print("db is empty!")
         bp_cve.read_Excel('data/TA-BP-CVE-TEST.xlsx', 'arrange-jk')
         print('select exploit..')
