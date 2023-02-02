@@ -259,7 +259,7 @@ class BP_CVE(PyExploitDb):
             'Github_PoC':sqlalchemy.dialects.mysql.MEDIUMTEXT
         }
         out_df = self.bp_df.copy()  
-        out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0][:-1])
+        out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0][:-1] if '(' in x else x)
         out_df.to_sql(name='BP_CVE', con=db_connection, if_exists='replace', index=False, dtype=dtypesql)
         conn.execute(f"ALTER TABLE BP_CVE ADD PRIMARY KEY(Id);")
         conn.close()
@@ -367,7 +367,6 @@ class BP_CVE(PyExploitDb):
             print(e)
             return None
         
-    
     def compare_df(self, db_df):
         # compare Github_PoC
         temp_bp_df = self.bp_df.copy()
