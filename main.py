@@ -68,24 +68,81 @@ class BP_CVE(PyExploitDb):
         files.close()
         return result
     
-    def openFile(self, exploitMap = "cveToEdbid.json", encoding="utf-8"):
-        if not os.path.isdir(self.exploitDbPath):
-            print("Cloning exploit-database repository")
-            git.Repo.clone_from("https://gitlab.com/exploit-database/exploitdb.git", self.exploitDbPath)
-            print("Updating db...")
-            self.updateDb()
-        else:
-            if self.autoUpdate == True:
-                print("Pulling exploit-database updates...")
-                git.Git(self.exploitDbPath).pull('origin', 'main')
-                print("Updating db...")
-                self.updateDb()
-            print("Loading database...")
-            with open(self.currentPath + "/" + exploitMap, encoding="utf-8") as fileData:
-                cveToExploitMap = json.load(fileData)
-                self.cveToExploitMap = cveToExploitMap
+    def updateDb(self):
+        data = {}
+        if not os.path.exists(self.edbidToCveFile):
+            #os.system("touch {0}".format(self.edbidToCveFile))
+            f = open(self.edbidToCveFile, 'w')
+            f.close()
+            data = {}
+        else: 
+            with open(self.edbidToCveFile, encoding="utf-8") as fileData:
+                try:
+                    data = json.load(fileData)
+                except:
+                    print("Possibly corrupt or empty: {0}".format(self.edbidToCveFile))
+                    os.remove(self.edbidToCveFile)
+                    f = open(self.edbidToCveFile, 'w')
+                    f.close()
+                    data = {}
+        files = open(self.exploitDbPath + "/files_exploits.csv", encoding="utf-8")
+        reader = csv.reader(files)
+        next(reader)
+        reader = list(reader)
+        edbCount = len(reader)
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+        def locations_of_substring(string, substring):
+           import re
+           results = [m.start() for m in re.finditer(substring, string)]
+           return results
+        print("Refreshing EDBID-CVE mapping. This may take a long time.")
+        for i in range(edbCount):
+            percentDone = (i / edbCount) * 100
+            if self.debug == True:
+                print("Processing...{0}%".format(str(percentDone)))
+            edb = tuple(reader[i])[0]
+            if edb in data:
                 if self.debug == True:
-                    print(self.cveToExploitMap)
+                    print("Skipping {0}".format(str(edb)))
+                pass
+            else:
+                content = ""
+                while True:
+                    try:
+                        requestUri = "https://www.exploit-db.com/exploits/{0}".format(str(edb))
+                        if self.debug == True:
+                            print("Requesting {0}".format(requestUri))
+                        r = requests.get(requestUri, headers = headers, timeout=10)
+                        content = r.content.decode("ISO-8859-1")
+                    except Exception as e:
+                        if self.debug == True:
+                            print("Error {0}".format(e))
+                        time.sleep(self.requestCoolOffTime)
+                        continue
+                    finally:
+                        break
+                indexes = locations_of_substring(content, 'https://nvd.nist.gov/vuln/detail/CVE-')
+                used = []
+                for pos in indexes:
+                      cve = r.content[pos + 33: pos + 33 + 14]
+                      if type(cve) == type(bytes()):
+                          cve = cve.decode("ISO-8859-1")
+                      cve = cve.replace('\"', '')
+                      cve = cve.replace('\r', '')
+                      cve = cve.replace('\n', '')
+                      if cve in used:
+                          continue
+                      used.append(cve)
+                data[edb] = used
+        with open(self.edbidToCveFile, "w", encoding="utf-8") as fileData:
+            json.dump(data, fileData, indent = 2)
+        self.cveToExploitMap = {}
+        for k, v in data.items():
+            for e in v:
+                self.cveToExploitMap[e] = self.cveToExploitMap.get(e, [])
+                self.cveToExploitMap[e].append(k)
+        with open(self.cveToEdbidFile, "w", encoding="utf-8") as fileData:
+            json.dump(self.cveToExploitMap, fileData, indent = 2)
     
     #create code   
     #init code
@@ -242,7 +299,7 @@ class BP_CVE(PyExploitDb):
             engine='xlsxwriter'
         )
         
-    def save_db(self, user, passwd, address, dbname):
+    def save_db(self, user, passwd, address, dbname, tablename):
         mysql_conn_str = f'mysql+pymysql://{user}:{passwd}@{address}/{dbname}'
         db_connection = create_engine(mysql_conn_str)
         conn = db_connection.connect()
@@ -259,9 +316,9 @@ class BP_CVE(PyExploitDb):
             'Github_PoC':sqlalchemy.dialects.mysql.MEDIUMTEXT
         }
         out_df = self.bp_df.copy()  
-        out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0][:-1] if '(' in x else x)
-        out_df.to_sql(name='BP_CVE', con=db_connection, if_exists='replace', index=False, dtype=dtypesql)
-        conn.execute(f"ALTER TABLE BP_CVE ADD PRIMARY KEY(Id);")
+        out_df['Name'] = out_df['Name'].apply(lambda x: x.split('(')[0] if '(' in x else x)
+        out_df.to_sql(name=tablename, con=db_connection, if_exists='replace', index=False, dtype=dtypesql)
+        conn.execute(f"ALTER TABLE {tablename} ADD PRIMARY KEY(Id);")
         conn.close()
         
         return
@@ -391,7 +448,7 @@ def sample():
     bp_cve = BP_CVE()
     
     print('Check DB...')
-    db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE')
+    db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE_test_230418')
     if db_df is None or db_df.empty:
         print("db is empty!")
         bp_cve.read_Excel('data/TA-BP-CVE-TEST.xlsx', 'arrange-jk')
@@ -419,7 +476,7 @@ def sample():
     print('make excel...')
     bp_cve.print_excel('data/')
     print('write DB...')
-    bp_cve.save_db('bp', '4523','10.0.0.206:3306','bp_cve')
+    bp_cve.save_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE_test_230418')
     bp_cve.count_priority()
     
     
@@ -433,32 +490,42 @@ def main():
     parser.add_argument('--db-passwd', dest='dbpasswd', help='MySQL DataBase Password', required=True)
     parser.add_argument('--db-host', dest='dbhost', help='MySQL DataBase Host(:port)', required=True)
     parser.add_argument('--db', dest='db', help='MySQL DataBase', required=True)
-    
+    parser.add_argument('--table', dest='table', help='MySQL Table', required=True)
     args = parser.parse_args()
     #print(args)
     
     bp_cve = BP_CVE()
-    bp_cve.read_Excel(args.bpcveexcel, args.bpcveexcelsheet)
-    
-    print('select exploit..')
-    ex_df = bp_cve.select_exploitdb()
-    net_df = bp_cve.select_pcap()
-    print('merge dataframe..')
-    bp_cve.merge_df(ex_df, net_df)
-    print('get CVSS...')
-    bp_cve.select_multiprocessing()
-    print('prioritize...')
-    bp_cve.prioritize()
-    print('regive ID...')
-    bp_cve.regive_ID(args.bpnum)
-    print('Compare DB and bp_df...')
-    db_df = bp_cve.get_db(args.dbuser, args.dbpasswd, args.dbhost, args.db, 'BP_CVE')
-    bp_cve.compare_df(db_df)
-    
+
+    print('Check DB...')
+    db_df = bp_cve.get_db(args.dbuser, args.dbpasswd, args.dbhost, args.db, args.table)
+    if db_df is None or db_df.empty:
+        print("db is empty!")
+        bp_cve.read_Excel(args.bpcveexcel, args.bpcveexcelsheet)
+        print('select exploit..')
+        ex_df = bp_cve.select_exploitdb()
+        net_df = bp_cve.select_pcap()
+        print('merge dataframe..')
+        bp_cve.merge_df(ex_df, net_df)
+        print('get CVSS...')
+        bp_cve.select_multiprocessing()
+        print('prioritize...')
+        bp_cve.prioritize()
+        print('regive ID...')
+        bp_cve.regive_ID(args.bpnum)
+        print('get PoC in Github...')
+        bp_cve.get_github_PoC()
+    else :
+        print("db is not empty!")
+        bp_cve.bp_df = db_df.copy()
+        print('get PoC in Github...')
+        bp_cve.get_github_PoC()
+        print('Compare DB and bp_df...')
+        bp_cve.compare_df(db_df)
+        
     print('make excel...')
     bp_cve.print_excel(args.output)
     print('write DB...')
-    bp_cve.save_db(args.dbuser, args.dbpasswd, args.dbhost, args.db)
+    bp_cve.save_db(args.dbuser, args.dbpasswd, args.dbhost, args.db, args.table)
     
     return
 
