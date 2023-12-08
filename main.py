@@ -4,7 +4,8 @@ from pyExploitDb import PyExploitDb
 import csv
 import re
 from scapy.all import *
-from scapy.layers import http
+from scapy.layers import http, tls
+from scapy.layers.tls.session import tlsSession
 import sqlalchemy
 from sqlalchemy import create_engine
 import requests
@@ -17,14 +18,17 @@ import git
 import json
 filterwarnings("ignore")
 
+load_layer("tls")
+load_layer("http")
+
 class BP_CVE(PyExploitDb):
-    def __init__(self):
+    def __init__(self, pcappath="./data/tcpdump/S1E1.pcap", sslkeylog = ""):
         super().__init__()
         self.bp_df = None
         self.debug = False
         self.pcap_packet = {}
         self.openFile()
-        self.read_pcap()
+        self.read_pcap(pcappath, sslkeylog)
         self.get_PoC()
     
     #overriding func
@@ -146,11 +150,12 @@ class BP_CVE(PyExploitDb):
     
     #create code   
     #init code
-    def read_pcap(self):
+    def read_pcap(self, pcappath, sslkeylog):
         print("Read pcap file...")
         conf.contribs["http"]["auto_compression"] = False
-        pkts = sniff(offline="./data/tcpdump/S1E1.pcap", session=TCPSession)
-        req = [p for p in pkts if p.haslayer(http.HTTPRequest)]
+        conf.tls_nss_filename = sslkeylog
+        pkts = sniff(offline=pcappath, session=TCPSession)
+        req = [p for p in pkts if p.haslayer(http.HTTP)]
         for pkt in req:
             try:
                 src = pkt['IP'].src
@@ -274,8 +279,13 @@ class BP_CVE(PyExploitDb):
             if xx in self.pcap_packet:
                 pkts = self.pcap_packet[xx]
                 for pkt in pkts:
-                    temp = str(pkt['HTTPRequest'])[2:-1].replace('\\r\\n', '\n')
-                    #print(temp)
+                    temp = ""
+                    if pkt.haslayer(http.HTTPRequest):
+                        temp = str(bytes(pkt['HTTPRequest']))[2:-1].replace('\\r\\n', '\r\n')
+                    else:
+                        data = str(pkt.payload.load).replace("b'",'').strip("'")
+                        if data.startswith('GET') or data.startswith('POST') or data.startswith('PUT') or data.startswith('HEAD') or data.startswith('DELETE') or data.startswith('OPTION'):
+                            temp = data
                     result += temp+'\n----------------------------------\n'
         if len(result) == 0:
             return np.NaN
@@ -307,7 +317,7 @@ class BP_CVE(PyExploitDb):
             'Id':sqlalchemy.types.VARCHAR(16),
             'Name':sqlalchemy.types.TEXT,
             'Reference':sqlalchemy.types.TEXT,
-            'Network':sqlalchemy.types.VARCHAR(255),
+            'Network':sqlalchemy.types.TEXT,
             'Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
             'Net_Exploit':sqlalchemy.dialects.mysql.MEDIUMTEXT,
             'CVSS':sqlalchemy.types.DECIMAL(3,1),
@@ -448,7 +458,7 @@ def sample():
     bp_cve = BP_CVE()
     
     print('Check DB...')
-    db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE_test_230418')
+    db_df = bp_cve.get_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE')
     if db_df is None or db_df.empty:
         print("db is empty!")
         bp_cve.read_Excel('data/TA-BP-CVE-TEST.xlsx', 'arrange-jk')
@@ -476,7 +486,7 @@ def sample():
     print('make excel...')
     bp_cve.print_excel('data/')
     print('write DB...')
-    bp_cve.save_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE_test_230418')
+    bp_cve.save_db('bp', '4523','10.0.0.206:3306','bp_cve', 'BP_CVE')
     bp_cve.count_priority()
     
     
